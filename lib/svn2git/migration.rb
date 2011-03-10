@@ -134,7 +134,8 @@ module Svn2Git
         # Non-standard repository layout.  The repository root is effectively 'trunk.'
         cmd = "git svn init "
         cmd += "--no-metadata " unless metadata
-        cmd += "--trunk=#{@url}"
+        cmd += "--trunk=#{@url} "
+		cmd += "--prefix=svn/"
         run_command(cmd)
 
       else
@@ -178,13 +179,13 @@ module Svn2Git
       @remote = run_command("git branch -r --no-color").split(/\n/).collect{ |b| b.gsub(/\*/,'').strip }
 
       # Tags are remote branches that start with "tags/".
-      @tags = @remote.find_all { |b| b.strip =~ %r{^tags\/} }
+      @tags = @remote.find_all { |b| b.strip =~ %r{^svn\/tags\/} }
     end
 
     def fix_tags
       @tags.each do |tag|
         tag = tag.strip
-        id = tag.gsub(%r{^tags\/}, '').strip
+        id = tag.gsub(%r{^svn\/tags\/}, '').strip
         subject = run_command("git log -1 --pretty=format:'%s' #{tag}")
         date = run_command("git log -1 --pretty=format:'%ci' #{tag}")
         subject = escape_quotes(subject)
@@ -197,18 +198,24 @@ module Svn2Git
 
     def fix_branches
       svn_branches = @remote.find_all { |b| not @tags.include?(b) }
+      svn_branches = @remote.find_all { |b| b.strip =~ %r{^svn\/} }
+      
+      if @options[:rebase]
+         run_command("git svn fetch")
+      end
+      
       svn_branches.each do |branch|
-        branch = branch.strip
-
+        branch = branch.gsub(/^svn\//,'').strip
         if @options[:rebase] && (@local.include?(branch) || branch == 'trunk')
-           branch = 'master' if branch == 'trunk'
-           run_command("git checkout -f #{branch}")
-           run_command("git svn rebase")
+           lbranch = branch
+           lbranch = 'master' if branch == 'trunk'
+           run_command("git checkout -f #{lbranch}")
+           run_command("git rebase remotes/svn/#{branch}")
            next
         end
 
-        next if branch == 'trunk'
-        run_command("git branch -t #{branch} remotes/#{branch}")
+        next if branch == 'trunk' || @local.include?(branch)
+        run_command("git branch -t #{branch} remotes/svn/#{branch}")
         run_command("git checkout #{branch}")
       end
     end
@@ -216,7 +223,7 @@ module Svn2Git
     def fix_trunk
       trunk = @remote.find { |b| b.strip == 'trunk' }
       if trunk && ! @options[:rebase]
-        run_command("git checkout trunk")
+        run_command("git checkout svn/trunk")
         run_command("git branch -D master")
         run_command("git checkout -f -b master")
       else
