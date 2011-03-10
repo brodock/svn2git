@@ -6,7 +6,7 @@ begin
   Jeweler::Tasks.new do |spec|
     spec.name = "svn2git"
     spec.summary = "A tool for migrating svn projects to git"
-    spec.authors = ["James Coglan", "Kevin Menard"]
+    spec.authors = ["James Coglan", "Kevin Menard", "James Snyder"]
     spec.homepage = "https://www.negativetwenty.net/redmine/projects/svn2git"
     spec.email = "nirvdrum@gmail.com"
   end
